@@ -7,57 +7,38 @@ import numpy as np
 #Select how many datapoints to use
 count = 500
 
-tim = np.empty(count)   # Initiate lists for collected data
-T1w = np.empty(count)
-T2w =np.empty(count)
-T1a = np.empty(count)
-T2a = np.empty(count)
-T1r = np.empty(count)
-T2r = np.empty(count)
-T3r = np.empty(count)
-T4r = np.empty(count)
-p2 = np.empty(count)
-p1 = np.empty(count)
-Ic = np.empty(count)
-Qc = np.empty(count)
+tim, T1w, T2w, T1a, T2a, T1r, T2r, T3r, T4r, p1, p2, Ic, Qc = np.loadtxt(
+    "HP_15May2026_07.txt",
+    comments='#',
+    skiprows=2,
+    unpack=True,
+)
 
+tim = np.array(tim[:count])   # Only read in the number of datapoints specified
+T1w = np.array(T1w[:count])
+T2w = np.array(T2w[:count])
+T1a = np.array(T1a[:count])
+T2a = np.array(T2a[:count])
+T1r = np.array(T1r[:count])
+T2r = np.array(T2r[:count])
+T3r = np.array(T3r[:count])
+T4r = np.array(T4r[:count])
+p2 = np.array(p2[:count])
+p1 = np.array(p1[:count])
+Ic = np.array(Ic[:count])
+Qc = np.array(Qc[:count])
 
-data_file = open("HP_15May2026_07.txt","r",encoding='UTF-8')
-title = data_file.readline() # Read first header line
-props = data_file.readline() # Read second header line
-
-#Delete header lines
-data_file = [x for x in data_file if not x.startswith('#')]
-# Now read in data line by line
-for i in range(count):
-    line = data_file[i]
-    vals = line.split() # Split each line into "words"
-
-    #Add data to lists
-    tim[i] = (eval(vals[0]))
-    T1w[i] = (eval(vals[1]))
-    T2w[i] = (eval(vals[2]))
-    T1a[i] = (eval(vals[3]))
-    T2a[i] = (eval(vals[4]))
-    T1r[i] = (eval(vals[5]))
-    T2r[i] = (eval(vals[6]))
-    T3r[i] = (eval(vals[7]))
-    T4r[i] = (eval(vals[8]))
-    p2[i] = (eval(vals[10]))
-    Ic[i] = (eval(vals[11]))
-    Qc[i] = (eval(vals[12]))
-
-
+#print(tim)
 #THIS ASSUMES THAT POINT 1 IS SATURATED
 h1 = CP.PropsSI ('H' , 'T', T1r+273, 'Q', 1, 'R134a')
-h2 = CP.PropsSI('H', 'T', T2r+273, 'P', 101325*p2, 'R134a')
+h2 = CP.PropsSI('H', 'T', T2r+273, 'P', 1e5*p2, 'R134a')
 
 p4 = CP.PropsSI('P','T',T4r+273,'Q',0.5,'R134a')/100000
 delta_p = p4-p1
 
 #Calculate internal COP assuming no pressure drop through the condenser
 p3 = p2
-h3 = CP.PropsSI('H', 'T',T3r+273,'P',101325*p3,'R134a')
+h3 = CP.PropsSI('H', 'T',T3r+273,'P',1e5*p3,'R134a')
 COPi = (h2-h3)/(h2-h1)
 
 #Calculate internal COP assuming point 3 is saturated
