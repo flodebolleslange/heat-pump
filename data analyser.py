@@ -22,7 +22,7 @@ Ic = np.empty(count)
 Qc = np.empty(count)
 
 
-data_file = open(r"C:\Users\Alexa\OneDrive\Documents\Alexander\Year 3\Heat pump\HP_15May2026_07.txt","r")
+data_file = open("HP_15May2026_07.txt","r",encoding='UTF-8')
 title = data_file.readline() # Read first header line
 props = data_file.readline() # Read second header line
 
@@ -72,10 +72,10 @@ COPe = (Qc/60000 * 1000 *4200*(T2w-T1w))/(Ic*240)
 #Using the first 500 datapoints:
 #h3_mean = 269146
 #h3sat_mean = 269266
-#Q4max = CP.PropsSI('Q','H',h3sat,'P',p4*100000,'R134a')
-#Q4min = CP.PropsSI('Q','H',h3,'P',p4*100000,'R134a')
-#print("Q4 Max:",np.mean(Q4max))
-#print("Q4 Min:",np.mean(Q4min))
+Q4max = CP.PropsSI('Q','H',h3sat,'P',p4*100000,'R134a')
+Q4min = CP.PropsSI('Q','H',h3,'P',p4*100000,'R134a')
+print("Q4 Max:",np.mean(Q4max))
+print("Q4 Min:",np.mean(Q4min))
 
 
 #plt.plot(tim,p3,label='p3')
