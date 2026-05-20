@@ -15,35 +15,35 @@ tim, T1w, T2w, T1a, T2a, T1r, T2r, T3r, T4r, p1, p2, Ic, Qc = np.loadtxt(
 )
 
 tim = np.array(tim[:count])   # Only read in the number of datapoints specified
-T1w = np.array(T1w[:count])
-T2w = np.array(T2w[:count])
-T1a = np.array(T1a[:count])
-T2a = np.array(T2a[:count])
-T1r = np.array(T1r[:count])
-T2r = np.array(T2r[:count])
-T3r = np.array(T3r[:count])
-T4r = np.array(T4r[:count])
-p2 = np.array(p2[:count])
-p1 = np.array(p1[:count])
+T1w = np.array(T1w[:count]) + 273.15
+T2w = np.array(T2w[:count]) + 273.15
+T1a = np.array(T1a[:count]) + 273.15
+T2a = np.array(T2a[:count]) + 273.15  
+T1r = np.array(T1r[:count]) + 273.15
+T2r = np.array(T2r[:count]) + 273.15
+T3r = np.array(T3r[:count]) + 273.15 
+T4r = np.array(T4r[:count]) + 273.15
+p2 = np.array(p2[:count]) * 100000  # Convert from bar to Pa
+p1 = np.array(p1[:count]) * 100000
 Ic = np.array(Ic[:count])
 Qc = np.array(Qc[:count])
 
 #print(tim)
 #THIS ASSUMES THAT POINT 1 IS SATURATED
-h1 = CP.PropsSI ('H' , 'T', T1r+273, 'Q', 1, 'R134a')
-h2 = CP.PropsSI('H', 'T', T2r+273, 'P', 1e5*p2, 'R134a')
+h1 = CP.PropsSI ('H' , 'T', T1r, 'Q', 1, 'R134a')
+h2 = CP.PropsSI('H', 'T', T2r, 'P', p2, 'R134a')
 
-p4 = CP.PropsSI('P','T',T4r+273,'Q',0.5,'R134a')/100000
+p4 = CP.PropsSI('P','T',T4r,'Q',0.5,'R134a')/100000
 delta_p = p4-p1
 
 #Calculate internal COP assuming no pressure drop through the condenser
 p3 = p2
-h3 = CP.PropsSI('H', 'T',T3r+273,'P',1e5*p3,'R134a')
+h3 = CP.PropsSI('H', 'T',T3r,'P',p3,'R134a')
 COPi = (h2-h3)/(h2-h1)
 
 #Calculate internal COP assuming point 3 is saturated
-h3sat = CP.PropsSI('H','T',T3r+273,'Q',0,'R134a')
-p3sat = CP.PropsSI('P','T',T3r+273,'Q',0.5,'R134a')/100000
+h3sat = CP.PropsSI('H','T',T3r,'Q',0,'R134a')
+p3sat = CP.PropsSI('P','T',T3r,'Q',0.5,'R134a')/100000
 COPi_h3sat = (h2-h3sat)/(h2-h1)
 
 #Calculate the external COP
