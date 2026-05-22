@@ -3,6 +3,7 @@
 import matplotlib.pyplot as plt
 import CoolProp.CoolProp as CP
 import numpy as np
+from ts_plotter import plot_refridgerant_cycle
 
 #Select how many datapoints to use
 count = 500
@@ -56,7 +57,9 @@ COPe = (Qc/60000 * 1000 *4200*(T2w-T1w))/(Ic*240)
 Q4max = CP.PropsSI('Q','H',h3sat,'P',p4*100000,'R134a')
 Q4min = CP.PropsSI('Q','H',h3,'P',p4*100000,'R134a')
 print("Q4 Max:",np.mean(Q4max))
-print("Q4 Min:",np.mean(Q4min))
+print("Q4 Min:",np.mean(Q4min)) 
+
+plot_refridgerant_cycle(tim[-100], T1r[-100], T2r[-100], T3r[-100], T4r[-100], p1[-100], p2[-100])
 
 
 #plt.plot(tim,p3,label='p3')
