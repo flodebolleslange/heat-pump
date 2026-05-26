@@ -75,10 +75,12 @@ def plotCOPgraph(fileName,count):
     plt.legend()
     plt.show()'''
 
+    #Twrat = T2w/T1w
+    deltaT = T2w-T1w
     Tvals = np.array([np.mean(T1r),np.mean(T2r),np.mean(T3r)])
     pvals = np.array([np.mean(p1),np.mean(p2),np.mean(p3)])
     svals = CP.PropsSI('S','T',Tvals,'P',pvals,'R134a')/1000
-    return Tvals-273,svals
+    return Tvals-273,svals,np.mean(COPe),np.mean(deltaT)
 
 def plot_satline(fluid):
     # Find critcal-point and triple-point pressures
@@ -102,25 +104,27 @@ def plot_satline(fluid):
 
     return (s, T, p, H)
 
+Twrats = []
 
-Tvals,svals = plotCOPgraph("full_fan_data/12Lmin-1.txt",500)
-plt.scatter(svals,Tvals,label="12Lmin-1")
+def collateFiles():
+    fullFanNames = ["12Lmin-1.txt","10Lmin-1.txt","9Lmin-1.txt","8Lmin-1.txt","7Lmin-1.txt"]
 
-Tvals,svals = plotCOPgraph("full_fan_data/10Lmin-1.txt",500)
-plt.scatter(svals,Tvals,label="10Lmin-1")
+    for filename in fullFanNames:
 
-Tvals,svals = plotCOPgraph("full_fan_data/9Lmin-1.txt",500)
-plt.scatter(svals,Tvals,label="9Lmin-1")
+        Tvals,svals,COPe,Twrat = plotCOPgraph("full_fan_data/"+filename,500)
+        plt.scatter(svals,Tvals,label=filename.rstrip(".txt"))
+        Twrats.append(Twrat)
+        print(filename.rstrip(".txt"),"COPe:",COPe)
 
-Tvals,svals = plotCOPgraph("full_fan_data/8Lmin-1.txt",500)
-plt.scatter(svals,Tvals,label="8Lmin-1")
-
-Tvals,svals = plotCOPgraph("full_fan_data/7Lmin-1.txt",500)
-plt.scatter(svals,Tvals,label="7Lmin-1")
-
+collateFiles()
 s,T,p,H = plot_satline('R134a')
 plt.plot(s,T)
 plt.legend()
+plt.xlabel("entropy (kJ/kg^-1K^-1)")
+plt.ylabel("Temperature (C)")
+plt.show()
+
+plt.plot([12,10,9,8,7],Twrats)
 plt.show()
 
 Tvals,svals = plotCOPgraph("full_flow_data/fan10.txt",500)
