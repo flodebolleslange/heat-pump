@@ -79,8 +79,8 @@ def plotCOPgraph(fileName,count):
     pr = p2/p1
     Tvals = np.array([np.mean(T1r),np.mean(T2r),np.mean(T3r)])
     pvals = np.array([np.mean(p1),np.mean(p2),np.mean(p3)])
-    svals = CP.PropsSI('S','T',Tvals,'P',pvals,'R134a')/1000
-    return Tvals-273,svals,np.mean(COPe),np.mean(COPi),np.mean(pr)
+    Hvals = CP.PropsSI('H','T',Tvals,'P',pvals,'R134a')
+    return pvals,Hvals/1000,np.mean(COPe),np.mean(COPi),np.mean(pr)
 
 def plot_satline(fluid):
     # Find critcal-point and triple-point pressures
@@ -109,10 +109,8 @@ def collateFullFanFiles():
 
     for filename in fullFanNames:
 
-        Tvals,svals,COPe,COPi,pr = plotCOPgraph("full_fan_data/"+filename,500)
-        plt.scatter(svals,Tvals,label=filename.rstrip(".txt"))
-        prs.append(pr)
-        COPis.append(COPi)
+        pvals,Hvals,COPe,COPi,pr = plotCOPgraph("full_fan_data/"+filename,500)
+        plt.scatter(Hvals,pvals/1e5,label=filename.rstrip(".txt"))
         print(filename.rstrip(".txt"),"COPe:",COPe)
 
 def collateFullFlowFiles():
@@ -120,43 +118,34 @@ def collateFullFlowFiles():
 
     for filename in fullFlowNames:
 
-        Tvals,svals,COPe,COPi,pr = plotCOPgraph("full_flow_data/"+filename,500)
-        #plt.scatter(svals,Tvals,label=filename.rstrip(".txt"))
-        prs.append(pr)
-        COPis.append(COPi)
+        pvals,Hvals,COPe,COPi,pr = plotCOPgraph("full_flow_data/"+filename,500)
+        plt.scatter(Hvals,pvals/1e5,label=filename.rstrip(".txt"))
         print(filename.rstrip(".txt"),"COPe:",COPe)
 
 
 
-prs = []
-COPis = []
+
 collateFullFanFiles()
 s,T,p,H = plot_satline('R134a')
-plt.plot(s,T)
+plt.plot(H,p)
 plt.legend()
-plt.xlabel("Specific Entropy (kJ/kg$^{-1}$K$^{-1}$)")
-plt.ylabel("Temperature (C)")
+plt.xlabel("Specific Enthalpy (kJ/kg$^{-1}$K$^{-1}$)")
+plt.ylabel("Pressure (bar)")
+plt.title("Full fan speed p-H diagram")
 plt.show()
 
 
-
-plt.plot(prs,COPis,label="Full Fan data",marker='x')
-labels = ["12Lmin-1","10Lmin-1","9Lmin_1","8Lmin-1","7Lmin-1"]
-for i in range(5):
-    plt.annotate(labels[i],xy=(prs[i],COPis[i]))
-prs= []
-COPis = []
-collateFullFlowFiles()
-plt.plot(prs,COPis,label="Full flow data",marker='x')
-plt.xlabel("Refrigerant pressure ratio")
-plt.ylabel("Intenal COP")
-
-labels = ["fan4","fan5","fan6","fan7","fan10"]
-for i in range(5):
-    plt.annotate(labels[i],xy=(prs[i],COPis[i]),xytext=(-2,0),textcoords='offset points')
+collateFullFanFiles()
+plt.plot(H,p)
 plt.legend()
-
+plt.xlabel("Specific Enthalpy (kJ/kg$^{-1}$K$^{-1}$)")
+plt.ylabel("Pressure (bar)")
+plt.title("Full flow p-H diagram")
 plt.show()
+
+#collateFullFlowFiles()
+
+
 '''
 Tvals,svals = plotCOPgraph("full_flow_data/fan10.txt",500)
 plt.scatter(svals,Tvals,label="fan10")
