@@ -80,8 +80,8 @@ def plotCOPgraph(fileName,count):
     Qoutr = h2-h3
     Tvals = np.array([np.mean(T1r),np.mean(T2r),np.mean(T3r)])
     pvals = np.array([np.mean(p1),np.mean(p2),np.mean(p3)])
-    svals = CP.PropsSI('S','T',Tvals,'P',pvals,'R134a')/1000
-    return Tvals-273,svals,np.mean(COPe),np.mean(COPi),np.mean(Qoutr),np.mean(pr)
+    Hvals = CP.PropsSI('H','T',Tvals,'P',pvals,'R134a')
+    return pvals,Hvals/1000,np.mean(COPe),np.mean(COPi),np.mean(pr)
 
 def plot_satline(fluid):
     # Find critcal-point and triple-point pressures
@@ -112,10 +112,8 @@ def collateFullFanFiles():
 
     for filename in fullFanNames:
 
-        Tvals,svals,COPe,COPi,Qoutr,pr = plotCOPgraph("full_fan_data/"+filename,500)
-        #plt.scatter(svals,Tvals,label=filename.rstrip(".txt"))
-        Qoutrs.append(Qoutr)
-        prs.append(pr)
+        pvals,Hvals,COPe,COPi,pr = plotCOPgraph("full_fan_data/"+filename,500)
+        plt.scatter(Hvals,pvals/1e5,label=filename.rstrip(".txt"))
         print(filename.rstrip(".txt"),"COPe:",COPe)
 
 def collateFullFlowFiles():
@@ -123,21 +121,33 @@ def collateFullFlowFiles():
 
     for filename in fullFlowNames:
 
-        Tvals,svals,COPe,COPi,Qoutr,pr = plotCOPgraph("full_flow_data/"+filename,500)
-        #plt.scatter(svals,Tvals,label=filename.rstrip(".txt"))
-        prs.append(pr)
-        Qoutrs.append(Qoutr)
-
+        pvals,Hvals,COPe,COPi,pr = plotCOPgraph("full_flow_data/"+filename,500)
+        plt.scatter(Hvals,pvals/1e5,label=filename.rstrip(".txt"))
         print(filename.rstrip(".txt"),"COPe:",COPe)
 
+
+
+
 collateFullFanFiles()
-plt.plot(prs,Qoutrs,label="Full Fan")
-prs = []
-Qoutrs = []
-collateFullFlowFiles()
-plt.plot(prs,Qoutrs,label="Full Fllow")
+s,T,p,H = plot_satline('R134a')
+plt.plot(H,p)
 plt.legend()
+plt.xlabel("Specific Enthalpy (kJ/kg$^{-1}$K$^{-1}$)")
+plt.ylabel("Pressure (bar)")
+plt.title("Full fan speed p-H diagram")
 plt.show()
+
+
+collateFullFanFiles()
+plt.plot(H,p)
+plt.legend()
+plt.xlabel("Specific Enthalpy (kJ/kg$^{-1}$K$^{-1}$)")
+plt.ylabel("Pressure (bar)")
+plt.title("Full flow p-H diagram")
+plt.show()
+
+#collateFullFlowFiles()
+
 
 '''
 Tvals,svals = plotCOPgraph("full_flow_data/fan10.txt",500)
