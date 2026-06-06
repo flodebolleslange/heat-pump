@@ -3,6 +3,10 @@ import CoolProp.CoolProp as CP
 import numpy as np
 from ts_plotter import plot_refridgerant_cycle
 import polars as pl
+import CoolProp.CoolProp as cp
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
 
 class Weather():
     """A class for defining global variables that affect all houses"""
@@ -24,7 +28,7 @@ class Weather():
         result_index_start = min(self.data.execute("""SELECT * FROM data WHERE STARTS_WITH(date,'"""+start_date+"""')""")['index'].to_list())
         result_index_end = max(self.data.execute("""SELECT * FROM data WHERE STARTS_WITH(date,'"""+end_date+"""')""")['index'].to_list())
         resultdf = self.data.execute("""SELECT * FROM data WHERE index>"""+str(result_index_start)+""" AND index<"""+str(result_index_end))
-        self.ambient_temps = resultdf["temp"].to_list()
+        self.ambient_temps = [n/10 for n in resultdf["temp"].to_list()]
         self.dates = resultdf["date"].to_list()
         hours = resultdf["hour"].to_list()
         minutes = resultdf["minute"].to_list()
@@ -49,13 +53,13 @@ class Weather():
     def update(self):
         """updates weather values for the next timestep"""
         self.index += 1
-        self.temp = self.ambient_temps[self.index]/10
+        self.temp = self.ambient_temps[self.index]
         self.time = self.times[self.index]
         self.date = self.dates[self.index]
 
 class Thermostat():
 
-    def __init__(self, file=None, thermostat_type='simple'):
+    def __init__(self, file=None, mode='simple'):
         if file:
             thermostat_datadf = pl.read_csv(file)
             thermostat_datadf = thermostat_datadf.with_row_index(name='index')
@@ -68,13 +72,13 @@ class Thermostat():
             on_temp = thermostat_data["on_temp"]
             off_temp = thermostat_data["off_temp"]
 
-        self.thermostat_type = thermostat_type
-        if thermostat_type == "simple":
+        self.mode = mode
+        if mode == "simple":
             # force the heatpump off
             self.off_temp = 20.0
             # force the heatpump on
             self.on_temp = 15.0
-        elif thermostat_type == "daily":
+        elif mode == "daily":
             self.setting = [times, on_temp, off_temp]
             self.index = 0
         
@@ -87,28 +91,20 @@ class Thermostat():
         self.list_overflow = False
 
     def update(self, time):
-        if self.thermostat_type == 'daily':
+        if self.mode == 'daily':
             if self.index >= len(self.setting[0])-1 and self.midnight_check == False:
-                print("last change of the day")
-                print(time)
                 self.list_overflow = True
             # if time is after the last item in settings and we haven't gone over midnight and we're not at max index
             if self.midnight_check == False and self.list_overflow == False and (time > self.setting[0][self.index+1]):
                 self.index += 1
-                print("daytime")
-                print(time)
             # if we've gone back in hours then we've gained a day - midnight has passed
             elif time < self.last_time:
-                print("past midnight")
-                print(time)
                 self.midnight_check = True
             # if we've gone past midnight, reset the counter 
             elif time > self.setting[0][0] and self.midnight_check == True:
                 self.index=0
                 self.list_overflow = False
                 self.midnight_check = False
-                print("morning")
-                print(time)
 
             # set the on and off temperatures
             self.on_temp = self.setting[1][self.index]
@@ -116,6 +112,54 @@ class Thermostat():
 
         # save the last time so we can detect midnight
         self.last_time = time
+
+class Heatpump():
+
+    def __init__(self):
+        # Heat pump assumptions
+        self.radiator = 60.0 # degC
+        self.pinch_point = 5 # K
+        self.isentropic_efficiency = 0.9
+
+        # false if heat pump is turned off
+        self.on = False
+
+        # store data in lists
+        self.works = []
+        self.heats = []
+        self.COPs = []
+        self.COP_carnots = []
+
+        # set values so that nothing crashes on first iteration
+        self.q_out = 0
+        self.work = 0
+        self.COP = 3.0
+        self.COP_carnot = 0
+
+    def calculate_cycle(self, Tambs):
+        # Refrigerant cycle
+        Tevap = Tambs - self.pinch_point          # degC, refrigerant colder than ambient
+        Tcond = self.radiator + self.pinch_point      # degC, refrigerant hotter than radiator water
+
+        Pcond = CP.PropsSI('P', 'T', Tcond + 273.15, 'Q', 0, 'R134a')
+
+        H1 = CP.PropsSI('H', 'T', Tevap + 273.15, 'Q', 1, 'R134a')
+        S1 = CP.PropsSI('S', 'T', Tevap + 273.15, 'Q', 1, 'R134a')
+
+        H2s = CP.PropsSI('H', 'P', Pcond, 'S', S1, 'R134a')
+        H2 = H1 + (H2s - H1) / self.isentropic_efficiency
+
+        H3 = CP.PropsSI('H', 'P', Pcond, 'Q', 0, 'R134a')
+        H4 = H3
+
+        mass_flow = 0.025361
+        q_out = (H2 - H3)*mass_flow
+        w_comp = (H2 - H1)*mass_flow
+
+        self.COP = q_out / w_comp
+        self.q_out = q_out
+        self.work = w_comp
+        self.COP_carnot = (Tcond + 273.15) / ((Tcond + 273.15) - (Tevap + 273.15))
 
 class House():
 
@@ -130,14 +174,21 @@ class House():
         self.getRtot()
 
         # set up thermostat
-        self.thermostat = Thermostat(file=r"C:\Users\simon\Code\git\heat-pump\thermostat-setting.csv", thermostat_type='daily')
+        self.thermostat = Thermostat(file=r"C:\Users\simon\Code\git\heat-pump\thermostat-setting.csv", mode='daily')
 
         # set up heat pump
-        # power of the heat pump may change.
-        self.heatpump_power = 3000
-        # false if heat pump is turned off
-        self.heatpump = False
+        self.heatpump = Heatpump()
+
+        # load weather data
         self.weather = Weather(r'C:\Users\simon\Code\git\heat-pump\weather-raw.csv')
+
+        # storage for generating graphs
+        self.temps = []
+        self.heatpump_work = []
+        self.electricity_costs = []
+        self.heatpump_on_times = []
+        self.heatpump_on_ambients = []
+        self.heatpump_on_temps = []
 
     def getRroof(self):
         insulation_thickness = 270.0  # mm
@@ -175,11 +226,12 @@ class House():
         self.thermal_coeff = self.kground + self.kair
 
     def find_next_temp(self, delta_t):
+        """models heat loss in the house over half a timestep"""
         air_reference = self.weather.temp*self.kair/self.thermal_coeff
         ground_reference = self.weather.ground_temp*self.kground/self.thermal_coeff
-        temp_in = self.heatpump_power/(self.heat_capacity*self.thermal_coeff)
+        temp_in = self.heatpump.q_out/(self.heat_capacity*self.thermal_coeff)
         
-        if self.heatpump == True:
+        if self.heatpump.on == True:
             coefficient = temp_in + ground_reference + air_reference
         else:
             coefficient = ground_reference + air_reference
@@ -188,44 +240,69 @@ class House():
     
     def timestep(self):
         """Models the heat pump over a timestep. Turns on/off using thermostat."""
-        # decides whether the heat pump needs to be on or off
+        # update the thermostat temperatures for the current time of day
         self.thermostat.update(self.weather.time)
         # activate or deactivate 
         if self.temp > self.thermostat.off_temp:
-            self.heatpump = False
+            self.heatpump.on = False
         elif self.temp < self.thermostat.on_temp:
-            self.heatpump = True
+            self.heatpump.on = True
         
+        # update the weather
         delta_t = self.weather.find_timestep()
         self.find_next_temp(delta_t)
         self.temps.append(self.temp)
-        if self.heatpump == True:
-            # find the cost of running the heatpupmp with fluctuating electricity prices
-            self.heatpump_usage.append(self.heatpump_power*delta_t)
-            self.electricity_costs.append(self.heatpump_power*delta_t*self.weather.electricity_price)
+
+        # work out the electricity used and add to list to plot
+        if self.heatpump.on == True:
+            # update the heatpump cycle
+            self.heatpump.calculate_cycle(self.weather.temp)
+            self.heatpump.works.append(self.heatpump.work*delta_t)
+            self.heatpump.heats.append(self.heatpump.q_out*delta_t)
+            # store the COP and Carnot COP
+            self.heatpump.COPs.append(self.heatpump.COP)
+            self.heatpump.COP_carnots.append(self.heatpump.COP_carnot)
+            # save the time that the heatpump turned on
+            self.heatpump_on_times.append(self.weather.time)
+            self.heatpump_on_ambients.append(self.weather.temp)
+            self.heatpump_on_temps.append(self.temp)
         else:
-            self.heatpump_usage.append(0)
-            self.electricity_costs.append(0)    
+            self.heatpump.works.append(0)
+            self.heatpump.heats.append(0)
+        # find the cost of running the heatpupmp with fluctuating electricity prices
+        self.electricity_costs.append(self.heatpump.work*delta_t*self.weather.electricity_price)
+
+        # set the weather to the next time step
         self.weather.update()      
 
     def iterate(self, start_date, end_date):
         """finds heat pump usage in a specified date range"""
 
-        # storage for generating graphs
-        self.temps = []
-        self.heatpump_usage = []
-        self.electricity_costs = []
-
         self.weather.unpack_temps(start_date, end_date)
         for n in range(len(self.weather.times)-1):
             self.timestep()
 
-        plt.plot(np.linspace(0,len(self.weather.ambient_temps)/48,num=len(self.weather.times)-1),self.temps,color='blue',label='house temp')
-        plt.plot(np.linspace(0,len(self.weather.ambient_temps)/48,num=len(self.weather.times)-1),[n/10 for n in self.weather.ambient_temps[:-1]],color='orange',label='ambient temp')
+        SPF = sum(self.heatpump.heats)/sum(self.heatpump.works)
+        print("SPF: ",SPF)
+
+        # creates a list of average COP values over a 24 hour period, ignoring points at which the heat pump is off
+        all_cops = [self.heatpump.heats[n]/self.heatpump.works[n] if self.heatpump.heats[n]>0 else 0 for n in range(len(self.heatpump.heats))]
+        daily_average_COP = [sum(all_cops[n-48:n+48]) / (len([m for m in all_cops[n-48:n+48] if m != 0])+1) for n in range(len(self.heatpump.works))]
+        variable1 = daily_average_COP
+        variable2 = self.heatpump.COP_carnots
+        plt.plot(np.linspace(0,len(self.weather.ambient_temps)/48,num=len(self.weather.times)-1),variable1,color='blue',label='average COP')
+        # plt.plot(np.linspace(0,len(self.weather.ambient_temps)/48,num=len(self.weather.times)-1),variable2,color='orange',label='outside')
         plt.xlabel('days')
-        plt.ylabel('house temp')
+        plt.ylabel('temps')
+        plt.legend()
+        plt.show()
+
+        plt.scatter(self.heatpump_on_times,self.heatpump.COPs,color='blue',label='COP')
+        plt.scatter(self.heatpump_on_times,self.heatpump.COP_carnots,color='orange',label='Carnot COP')
+        plt.xlabel('hour')
+        plt.ylabel('COP')
         plt.legend()
         plt.show()
 
 house = House()
-house.iterate("2026-05-01","2026-06-01")
+house.iterate("2026-01-01","2026-01-01")
