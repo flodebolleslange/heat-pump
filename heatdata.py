@@ -288,7 +288,7 @@ class House():
         # creates a list of average COP values over a 24 hour period, ignoring points at which the heat pump is off
         all_cops = [self.heatpump.heats[n]/self.heatpump.works[n] if self.heatpump.heats[n]>0 else 0 for n in range(len(self.heatpump.heats))]
         daily_average_COP = [sum(all_cops[n-48:n+48]) / (len([m for m in all_cops[n-48:n+48] if m != 0])+1) for n in range(len(self.heatpump.works))]
-        variable1 = daily_average_COP
+        variable1 = self.heatpump.heats
         variable2 = self.heatpump.COP_carnots
         plt.plot(np.linspace(0,len(self.weather.ambient_temps)/48,num=len(self.weather.times)-1),variable1,color='blue',label='average COP')
         # plt.plot(np.linspace(0,len(self.weather.ambient_temps)/48,num=len(self.weather.times)-1),variable2,color='orange',label='outside')
@@ -297,12 +297,12 @@ class House():
         plt.legend()
         plt.show()
 
-        plt.scatter(self.heatpump_on_times,self.heatpump.COPs,color='blue',label='COP')
-        plt.scatter(self.heatpump_on_times,self.heatpump.COP_carnots,color='orange',label='Carnot COP')
-        plt.xlabel('hour')
-        plt.ylabel('COP')
-        plt.legend()
-        plt.show()
+        # plt.scatter(self.heatpump_on_times,self.heatpump.COPs,color='blue',label='COP')
+        # plt.scatter(self.heatpump_on_times,self.heatpump.COP_carnots,color='orange',label='Carnot COP')
+        # plt.xlabel('hour')
+        # plt.ylabel('COP')
+        # plt.legend()
+        # plt.show()
 
 house = House()
 house.iterate("2026-01-01","2026-01-01")
