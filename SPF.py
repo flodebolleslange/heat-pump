@@ -135,7 +135,8 @@ def main():
 main()
 
 def otherMain():
-    qair = 1005 * 5
+    mdot_air = 0.95 # from measurements
+    qair = 1005 * 0.95
     print("q_air =",qair)
 
     h1 = CP.PropsSI('H','T',15+273)
