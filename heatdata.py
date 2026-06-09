@@ -174,13 +174,13 @@ class House():
         self.getRtot()
 
         # set up thermostat
-        self.thermostat = Thermostat(file=r"C:\Users\simon\Code\git\heat-pump\thermostat-setting.csv", mode='daily')
+        self.thermostat = Thermostat(file=r"thermostat-setting.csv", mode='daily')
 
         # set up heat pump
         self.heatpump = Heatpump()
 
         # load weather data
-        self.weather = Weather(r'C:\Users\simon\Code\git\heat-pump\weather-raw.csv')
+        self.weather = Weather(r'weather-raw.csv')
 
         # storage for generating graphs
         self.temps = []
