@@ -17,6 +17,7 @@ def getQfloor(Tground):
     thickness = 30
     U_total = U_specific/thickness
     return (Thouse-Tground)*U_total*(house['length']*house['width'])
+    return (Thouse-Tground)*U_total*(house['length']*house['width'])
 
 def getQwalls(Tamb):
     Rbrick = (1/846.67)*102.5 #brick thickness of 102.5mm
@@ -27,12 +28,19 @@ def getQwalls(Tamb):
 
 def getQtot(Tamb,numHalfHours):
     Tground = getTground(numHalfHours)
+def getQtot(Tamb,numHalfHours):
+    Tground = getTground(numHalfHours)
     Qroof = getQroof(Tamb)
     Qwalls = getQwalls(Tamb)
+    Qfloor = getQfloor(Tground)
     Qfloor = getQfloor(Tground)
     Qtot = Qroof + Qwalls + Qfloor
     return Qtot
 
+def getTground(numHalfHours):
+    x=np.arange(numHalfHours)
+    Tground =  12-7*np.cos(((x+4*30*48)*2*np.pi)/(12*30*48))
+    return Tground
 def getTground(numHalfHours):
     x=np.arange(numHalfHours)
     Tground =  12-7*np.cos(((x+4*30*48)*2*np.pi)/(12*30*48))
@@ -42,6 +50,7 @@ def getTambs():
     Tambs = []
     times = []
     file = list(open('half-hourly-Tamb.csv',mode='r'))
+    file = list(open('half-hourly-Tamb.csv',mode='r'))
     file = file[1:]
     for line in file:
         line = line.split(",")
@@ -50,13 +59,17 @@ def getTambs():
 
     
     return Tambs,times
+    return Tambs,times
 
+def peterFunc(Tambs,times):
+    Tthermostat = 17
 def peterFunc(Tambs,times):
     Tthermostat = 17
     # Heat pump assumptions
     radiator = 60.0             # degC
     pinch_point = 5        # K
     isentropic_efficiency = 0.9
+    index = np.arange(1, len(Tambs) + 1)
     index = np.arange(1, len(Tambs) + 1)
 
 
@@ -81,7 +94,14 @@ def peterFunc(Tambs,times):
 
     fanPower = 0.8*245 * 0 #0.8A draw at 245V
     COP = q_out / (w_comp + fanPower)
+    fanPower = 0.8*245 * 0 #0.8A draw at 245V
+    COP = q_out / (w_comp + fanPower)
 
+    Q_house = getQtot(Tambs,len(times))
+    #heating = Q_house > 0
+    heating = Tambs < Tthermostat
+    heating2 = np.array([False if int(item[:2])<=6 or int(item[:2])>=22 else True for item in times])
+    heating = np.array(heating) & heating2
     Q_house = getQtot(Tambs,len(times))
     #heating = Q_house > 0
     heating = Tambs < Tthermostat
@@ -91,6 +111,7 @@ def peterFunc(Tambs,times):
 
     # compressor power needed to meet demand
    
+   
     W_required = np.zeros_like(Q_house)
     W_required[heating] = Q_house[heating] / COP[heating]
 
@@ -99,12 +120,22 @@ def peterFunc(Tambs,times):
 
 
     SPF_plot = np.full_like(index, SPF, dtype=float)
+    SPF_plot = np.full_like(index, SPF, dtype=float)
 
     COP_carnot = (Tcond + 273.15) / ((Tcond + 273.15) - (Tevap + 273.15))
 
     index = index/48
     Tground = getTground(len(index))
+    index = index/48
+    Tground = getTground(len(index))
     plt.figure()
+    plt.plot(index, COP, label='Cycle COP')
+    plt.plot(index, SPF_plot, label=f'SPF = {SPF:.2f}')
+    plt.plot(index, COP_carnot, label='Carnot COP')
+    plt.plot(index,Tground,label="Ground temperature")
+
+    print("Total work (kWhr)=",np.sum(W_required[heating])/1000*0.5)
+    print("Total heat demand (kWhr)=",np.sum(Q_house[heating])/1000*0.5)
     plt.plot(index, COP, label='Cycle COP')
     plt.plot(index, SPF_plot, label=f'SPF = {SPF:.2f}')
     plt.plot(index, COP_carnot, label='Carnot COP')
@@ -120,6 +151,8 @@ def peterFunc(Tambs,times):
     plt.legend()
     plt.show()
 
+    plt.plot(index, Q_house, label='Heat Demand (W)')
+    plt.plot(index, W_required, label='Compressor Power Required (W)')
     plt.plot(index, Q_house, label='Heat Demand (W)')
     plt.plot(index, W_required, label='Compressor Power Required (W)')
     plt.xlabel('Day')

@@ -36,7 +36,8 @@ class Weather():
         self.times = [hours[n]+minutes[n]/60+seconds[n]/3600 for n in range(len(hours))]
         self.index = 0
         self.temp = self.ambient_temps[0]
-        self.ground_temp = 11.0
+        x=np.arange(len(self.times))
+        self.groundtemp_list =  list(12-7*np.cos(((x+ (float(start_date[5:7])*30+float(start_date[8:10]))*48 )*2*np.pi)/(12*30*48)))
 
     def find_timestep(self):
         """finds the time difference between the current and next data"""
@@ -56,6 +57,7 @@ class Weather():
         self.temp = self.ambient_temps[self.index]
         self.time = self.times[self.index]
         self.date = self.dates[self.index]
+        self.groundtemp = self.groundtemp_list[self.index]
 
 class Thermostat():
 
@@ -134,7 +136,7 @@ class Heatpump():
         self.q_out = 0
         self.work = 0
         self.COP = 3.0
-        self.COP_carnot = 0
+        self.COP_carnot = 3.0
 
     def calculate_cycle(self, Tambs):
         # Refrigerant cycle
@@ -152,11 +154,12 @@ class Heatpump():
         H3 = CP.PropsSI('H', 'P', Pcond, 'Q', 0, 'R134a')
         H4 = H3
 
+        fanPower = 0.8*245
         mass_flow = 0.025361
         q_out = (H2 - H3)*mass_flow
         w_comp = (H2 - H1)*mass_flow
 
-        self.COP = q_out / w_comp
+        self.COP = q_out / (w_comp+fanPower)
         self.q_out = q_out
         self.work = w_comp
         self.COP_carnot = (Tcond + 273.15) / ((Tcond + 273.15) - (Tevap + 273.15))
@@ -228,7 +231,7 @@ class House():
     def find_next_temp(self, delta_t):
         """models heat loss in the house over half a timestep"""
         air_reference = self.weather.temp*self.kair/self.thermal_coeff
-        ground_reference = self.weather.ground_temp*self.kground/self.thermal_coeff
+        ground_reference = self.weather.groundtemp*self.kground/self.thermal_coeff
         temp_in = self.heatpump.q_out/(self.heat_capacity*self.thermal_coeff)
         
         if self.heatpump.on == True:
@@ -237,7 +240,7 @@ class House():
             coefficient = ground_reference + air_reference
 
         self.temp = coefficient + (self.temp - coefficient) * np.e**(-delta_t*self.thermal_coeff*3600)
-    
+
     def timestep(self):
         """Models the heat pump over a timestep. Turns on/off using thermostat."""
         # update the thermostat temperatures for the current time of day
@@ -287,11 +290,47 @@ class House():
 
         # creates a list of average COP values over a 24 hour period, ignoring points at which the heat pump is off
         all_cops = [self.heatpump.heats[n]/self.heatpump.works[n] if self.heatpump.heats[n]>0 else 0 for n in range(len(self.heatpump.heats))]
+        all_carnots  = [self.heatpump.heats[n]/self.heatpump.works[n] if self.heatpump.heats[n]>0 else 0 for n in range(len(self.heatpump.heats))]
         daily_average_COP = [sum(all_cops[n-48:n+48]) / (len([m for m in all_cops[n-48:n+48] if m != 0])+1) for n in range(len(self.heatpump.works))]
-        variable1 = daily_average_COP
-        variable2 = self.heatpump.COP_carnots
-        plt.plot(np.linspace(0,len(self.weather.ambient_temps)/48,num=len(self.weather.times)-1),variable1,color='blue',label='average COP')
-        # plt.plot(np.linspace(0,len(self.weather.ambient_temps)/48,num=len(self.weather.times)-1),variable2,color='orange',label='outside')
+        filler_var1 = all_carnots
+        daily_average_carnot = [sum(filler_var1[n-48:n+48]) / (len([m for m in filler_var1[n-48:n+48] if m != 0])+1) for n in range(len(self.heatpump.works))]
+        filler_var1 = self.heatpump.works
+        daily_average_work = [sum(filler_var1[n-48:n+48]) / (len([m for m in filler_var1[n-48:n+48] if m != 0])+1) for n in range(len(self.heatpump.works))]
+        filler_var1 = self.heatpump.heats
+        daily_average_heat = [sum(filler_var1[n-48:n+48]) / (len([m for m in filler_var1[n-48:n+48] if m != 0])+1) for n in range(len(self.heatpump.works))]
+        filler_var1 = self.weather.ambient_temps
+        daily_average_temp = [sum(filler_var1[n-48:n+48]) / (len([m for m in filler_var1[n-48:n+48] if m != 0])+1) for n in range(len(self.heatpump.works))]
+        filler_var1 = self.temps
+        daily_house_temp = [sum(filler_var1[n-48:n+48]) / (len([m for m in filler_var1[n-48:n+48] if m != 0])+1) for n in range(len(self.heatpump.works))]
+
+        index = np.linspace(0,len(self.weather.ambient_temps)/48,num=len(self.weather.times)-1)
+        plt.figure()
+
+        fig, ax = plt.subplots(layout='constrained')
+
+        ax.plot(index, daily_average_COP, label='Cycle COP', color='green')
+        ax.plot(index, daily_average_carnot, label='Carnot COP', color='blue')
+        ax.legend()
+
+        ax2 = ax.twinx()
+        ax2.plot(index, daily_average_temp, label='Ambient temperature', color='orange')
+        ax2.plot(index, daily_house_temp, label='House temperature', color='red')
+        ax2.legend()
+        fig.tight_layout()
+
+        # plt.plot(index,self.weather.groundtemp_list[:-1],label="Ground temperature")
+
+        print("Total work (kWhr)=",np.sum(self.heatpump.works)/1000)
+        print("Total heat demand (kWhr)=",np.sum(self.heatpump.heats)/1000)
+
+        ax.set_xlabel('Day')
+        ax.set_ylabel('COP')
+        ax2.set_ylabel('Temperature')
+        plt.grid(True)
+        plt.show()
+
+        plt.plot(index,self.heatpump.heats,color='blue',label='heat')
+        plt.plot(index,self.heatpump.works,color='orange',label='work')
         plt.xlabel('days')
         plt.ylabel('temps')
         plt.legend()
@@ -305,4 +344,4 @@ class House():
         plt.show()
 
 house = House()
-house.iterate("2026-01-01","2026-01-01")
+house.iterate("2025-01-01","2025-01-02")
